@@ -1,6 +1,5 @@
 ###################################### R for Absolute Beginners #####################################################
-# FB 03 - Institute for Social Choice
-# David Bustamante -> davidbustamantelazo@uni-mainz.de
+# David Bustamante 
 
 
 # Let us begin as usual by errasing the memory and setting our wd
