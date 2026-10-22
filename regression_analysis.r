@@ -6,9 +6,9 @@ gc()
 
 # selecting our path ---> not needed if working from a cloned Git
 if (.Platform$OS.type == "windows") {
-    setwd("G:/My Drive/1. PhD Emp. Social Choice/2. Lehre/Bachelor/R Uebung")
+    setwd("PATHSWIN")
 } else {
-    setwd("/home/davidbl/Desktop/1. PhD Emp. Social Choice/2. Lehre/Bachelor/R Uebung")
+    setwd("PATHSLINUX")
 }
 
 # English Format and Avoiding scientific notation
