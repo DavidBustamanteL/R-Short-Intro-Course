@@ -6,7 +6,11 @@
 
 - Once you get familiar with it, you’ll see how much it can simplify your data work and help you later when  
   learning other languages, such as Python. Mastering tools like R also opens up many future job opportunities  
-  in data-driven fields.  
+  in data-driven fields.
+
+- Why learning to code in times of AI? Even if those models are so powerfull, being able to "speak" their language
+  will give you quite the competitive advantage over "vibe-coders", who never really understand the output and put
+  their blind-faith into the AI.
 
 
 ---
