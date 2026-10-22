@@ -18,7 +18,6 @@ I would kindly ask you to download R and Positron on your computers.
 ### R
 The latest version of R can be found at:  
 https://cran.r-project.org/  
-At this moment, it's called **“Because it was There”**.
 
 ### Positron
 Please follow this link:  
