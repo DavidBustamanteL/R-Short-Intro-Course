@@ -1,6 +1,8 @@
 ## So, why learn R?
 
-![](R_Excel.png){height=300px fig-align="center"}
+<p align="center">
+  <img src="R_Excel.png" height="300">
+</p>
 
 - R is a free and powerful programming language designed for data analysis, statistics, and visualization.  
   It’s widely used in research, academia, and many professional fields — from economics and psychology to  
