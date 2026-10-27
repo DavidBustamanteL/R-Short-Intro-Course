@@ -1,5 +1,7 @@
 ## So, why learn R?
 
+![](R vs Excel_Same Data, Different Vibes.png){height=300px fig-align="center"}
+
 - R is a free and powerful programming language designed for data analysis, statistics, and visualization.  
   It’s widely used in research, academia, and many professional fields — from economics and psychology to  
   biology and the social sciences.  
