@@ -4,15 +4,19 @@
 
 # Let us begin as usual by errasing the memory and setting our wd
 rm(list = ls())
+gc()
+
+# Setting a WD if wanted (not needed)
 setwd("YOURPATH")
 
-# English Format and Avoiding scientific notation
+# English Format
 if (.Platform$OS.type == "windows") {
   Sys.setlocale("LC_TIME", "English")
 } else {
   Sys.setlocale("LC_TIME", "en_US.utf8")
 }
 
+# Avoiding scientific notation
 options(scipen = 999)
 
 
