@@ -20,7 +20,7 @@ if (.Platform$OS.type == "windows") {
 options(scipen = 999)
 
 
-# Package Installation
+# Package Installation (if not installed yet)
 # List of packages
 #package_list = c("tidyverse", "dplyr", "stringr", "ggplot2", "ggthemes", "ggrepel", "ggpubr", "ggpp",
 #"readxl", "readr", "eurostat", "giscoR", "viridis", "sf", "RColorBrewer", "reshape2", "jsonlite",
