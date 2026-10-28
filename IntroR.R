@@ -9,22 +9,25 @@ gc()
 # Setting a WD if wanted (not needed)
 setwd("YOURPATH")
 
-# English Format
+# English Format and Avoiding scientific notation
 if (.Platform$OS.type == "windows") {
   Sys.setlocale("LC_TIME", "English")
 } else {
   Sys.setlocale("LC_TIME", "en_US.utf8")
 }
 
-# Avoiding scientific notation
 options(scipen = 999)
 
 
-# Package Installation (if not installed yet)
+# Package Installation
 # List of packages
-#package_list = c("tidyverse", "dplyr", "stringr", "ggplot2", "ggthemes", "ggrepel", "ggpubr", "ggpp",
-#"readxl", "readr", "eurostat", "giscoR", "viridis", "sf", "RColorBrewer", "reshape2", "jsonlite",
-#"rjson", "rstatix", "lubridate", "gtsummary", "haven", "stargazer", "forcats", "magrittr", "gapminder")
+#package_list = c(
+#  "tidyverse", "dplyr", "stringr", "forcats", "magrittr", "lubridate", "reshape2",
+#  "readxl", "readr", "haven", "jsonlite", "rjson", "eurostat", "gapminder",
+#  "ggplot2", "ggthemes", "ggrepel", "ggpubr", "ggpp", "ggtext", "GGally",
+#  "viridis", "RColorBrewer",
+#  "giscoR", "sf", "maps", "mapproj", "rnaturalearth",
+#  "modelsummary", "rstatix", "gtsummary", "stargazer")
 
 # Installation
 #for(i in package_list){
@@ -35,14 +38,13 @@ options(scipen = 999)
 #}
 
 # Where to see the packages? -> extention to Positron
-
 ### Packages ###
 # Data transformation, manipulation
 library(tidyverse)                      # META-Package (ggplot, readr, tidyr, purrr, etc.)
 library(dplyr)                          # mutate/filter/filter/join
 library(stringr)                        # string operation
 library(forcats)                        # factor handling
-library(magrittr)                       # pipes
+library(magrittr)                       # extended pipes
 library(lubridate)                      # dates/times
 library(reshape2)                       # wide/long formats
 
@@ -84,6 +86,7 @@ library(stargazer)                      # reg and summary tables for papers
 
 ## CSV ##
 wages = read.csv("wage1.csv", header = TRUE, sep = ",")
+# wages = read.csv("FOLDERNAME/wage1.csv, header = T, sep = ","")  if working from a cloned Git
 
 ## Excel ##
 covid_gender_straints = read_excel("aufgabe1.1.xlsx", sheet = "Abb2.", range = "B4:D9")
@@ -102,15 +105,14 @@ nuts2_shapes = gisco_get_nuts(nuts_level = 2, resolution = "01")
 colnames(wages)
 
 # Finding specific variables
-grep("inco", names(wages), value = T)
+grep("ed", colnames(wages), value = T)
 
 # Summary Stats
 summarise(wages, mean(wage), mean(educ), median(wage), median(educ), var(wage), var(educ))
 tidy(wages)
 
-
 ## intro to ggplot2 ##
-ggplot(wages, aes(x = exper, y = wage, color = nonwhite)) +
+ggplot(wages, aes(x = exper, y = wage, color = as.factor(nonwhite))) +
   geom_point(alpha = 0.6, size = 2) +
   geom_smooth(method = "lm", se = FALSE) +
   labs(
@@ -136,14 +138,17 @@ x = 1
 typeof(x)
 x = as.character(x)
 
-x_a = as.integer(x)
-x_b = as.double(x)
+x_a = as.integer(x)          # for "smaller" ranges (+/-2.1 billion)
+x_b = as.double(x)           # for larger ranges (1.8 * 10^308 billion)
 
+1 + x
 1 + x_a
+1 + x_b
 
 y = "Hello World"
 print(y)
 typeof(y)
+
 
 # Vectors, Lists, and Factors #
 # Atomic Vectors -> one-type-of-element vectors
@@ -209,7 +214,7 @@ sign(0)
 # Other return values
 test = function(x, y){
   if(length(x) != length(y)){
-    return("ERROR: Both vectors HAVE to have the SAME amount of elements")}
+    return("ERROR: Both vectors MUST have the SAME amount of elements")}
   else {
     x * y}
 }
@@ -270,6 +275,7 @@ operations = list(mean, median, var, sd)
 purrr::map(operations, exec, x = as.numeric(dp[[1]]))
 map_dbl(operations, .f = exec, x = as.numeric(dp[[1]]))
 
+
 #### 3. Data Simulation ####
 
 # Choosing a seed for later replication
@@ -288,8 +294,8 @@ stata_test2 = data.frame(var1 = x1, var2 = x2, var3 = x3, var4 = x4, var5 = x5)
 # Saving the tibble as a dta-file
 write_dta(stata_test, "stata_test.dta")
 
-# Importing do-files (stata files)
-stata_test = read_dta("stata_test.dta")
+# Importing do-files (stata files) with read_dta
+#stata_test = read_dta("stata_test.dta")
 
 
 #### 4. Data Manipulation/Transformation ####
@@ -298,15 +304,15 @@ stata_test = read_dta("stata_test.dta")
 # TRIBBLE -> lay out the wall by writing each row one by one
 x = tribble(
   ~id, ~sex, ~age,
-  1, "M", "25",
-  2, "F", "40",
-  3, "M", "18")
+  factor(1), factor("M"), "25",
+  factor(2), factor("F"), "40",
+  factor(3), factor("M"), "18")
 
 y = tribble(
   ~id, ~income, ~expenses,
-  1, "1750", "1100",
-  2, "2540", "1760",
-  4, "3000", "890")
+  factor(1), "1750", "1100",
+  factor(2), "2540", "1760",
+  factor(4), "3000", "890")
 
 # Joints #
 # inner join: new df only has the obs included in BOTH old dfs
@@ -324,9 +330,9 @@ full = full_join(x, y, by = "id")
 # stacking # -> e.g., good for panel data
 z = tribble(
   ~id, ~sex, ~age,
-  14, "F", "95",
-  25, "F", "34",
-  36, "M", "48")
+  factor(14), factor("F"), "95",
+  factor(25), factor("F"), "34",
+  factor(36), factor("M"), "48")
 
 full_long = rbind(x, z)
 
@@ -547,7 +553,7 @@ arrests.geo %>%
   scale_fill_continuous(name = "Assault\nRates",
                         low = "#e4d7d7ff",
                         high = "#CC0033") +                                    # Economist-like light to dark red JGU color scale
-  theme_economist_white(base_size = 15) +                                        # Economist white theme
+  theme_economist(base_size = 15) +                                        # Economist white theme
   theme(
     panel.background = element_blank(),                                          # Remove gray background
     legend.background = element_blank(),                                         # Remove legend background
@@ -577,7 +583,6 @@ ggsave("theecon_plot.png")
 
 
 ## Publication-quality plots ##
-## From bscfiskalfoederalismuswt2526:
 gdp.search = search_eurostat("Gross domestic product")                           # Eurostat code: nama_10r_2gdp
 
 gdp = get_eurostat(id = gdp.search$code[4], select_time = "Y") %>% 
