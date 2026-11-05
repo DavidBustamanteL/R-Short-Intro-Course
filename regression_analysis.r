@@ -1396,3 +1396,29 @@ modelsummary(
 
 
 #### 5. Multinomial Logit ####
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#### 6. Differences betw. logits and probits ####
+
+# Logit models assume a logistic error distribution, whereas probit models
+# assume a normal error distribution. In binary regression, both estimate
+# probabilities for two outcomes and generally yield similar results, but
+# their coefficients differ in scale. In ordered regression, both model
+# ordered categories using estimated thresholds, differing in their assumed
+# error distributions. In multinomial regression, logit assumes independent
+# type-I extreme-value errors, implying the Independence of Irrelevant
+# Alternatives (IIA) property, whereas probit assumes jointly normal errors,
+# allowing correlation across alternatives and more flexible substitution
+# patterns when the error covariance matrix is sufficiently unrestricted.
