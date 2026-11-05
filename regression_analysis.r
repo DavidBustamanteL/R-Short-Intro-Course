@@ -88,6 +88,7 @@ ggplot(wages, aes(x = educ, y = wage)) +
     theme_minimal()
 
 
+
 #### 3. Ordinary Least Squares (OLS) ####
 
 # Baseline specification
@@ -104,12 +105,12 @@ tidy(ols_reg)
 
 # Format p-values
 tidy(ols_reg, conf.int = TRUE) %>%
-    mutate(p.value = formatC(p.value, format = "f", digits = 5))
+    mutate(p.value = formatC(p.value, format = "f", digits = 8))
 
 # Publication-style table
 modelsummary(
-  ols_reg,
-  stars = c(
+    ols_reg,
+    stars = c(
         "*" = 0.10,
         "**" = 0.05,
         "***" = 0.01
@@ -126,18 +127,18 @@ coef(ols_reg)
 vcov(ols_reg)
 
 # Confidence intervals
-confint(ols_reg)
+confint(ols_reg, level = 0.95)
 
 # Fitted values and residuals
 head(fitted(ols_reg))
 head(residuals(ols_reg))
 
-# Predictions -> returns the predicted hourly wages for the first six individuals in the dataset
+# Predictions -> returns the predicted hourly wages for the first six individuals in the dataset, same as fitted if not used in new data
 head(predict(ols_reg))
 
 # Interpretation:
-# educ: expected wage change for one additional year of education,
-#       holding other regressors constant.
+# educ: expected avg wage change for one additional year of education,
+#       holding other regressors constant (c.p.).
 #
 # exper: expected wage change for one additional year of experience.
 #
@@ -159,6 +160,12 @@ model_classical = econ_lm(
 )
 
 # Heteroskedasticity-consistent standard errors
+model_hc0 = econ_lm(
+    wage ~ educ + exper + nonwhite + female + married,
+    data = wages,
+    vcov = "HC0"
+)
+
 model_hc1 = econ_lm(
     wage ~ educ + exper + nonwhite + female + married,
     data = wages,
@@ -177,13 +184,35 @@ model_hc3 = econ_lm(
     vcov = "HC3"
 )
 
+model_hc4 = econ_lm(
+    wage ~ educ + exper + nonwhite + female + married,
+    data = wages,
+    vcov = "HC4"
+)
+
+model_hc4m = econ_lm(
+    wage ~ educ + exper + nonwhite + female + married,
+    data = wages,
+    vcov = "HC4m"
+)
+
+model_hc5 = econ_lm(
+    wage ~ educ + exper + nonwhite + female + married,
+    data = wages,
+    vcov = "HC5"
+)
+
 # Compare standard errors
 modelsummary(
     list(
         "Classical" = model_classical,
+        "HC0" = model_hc0,
         "HC1" = model_hc1,
         "HC2" = model_hc2,
-        "HC3" = model_hc3
+        "HC3" = model_hc3,
+        "HC4" = model_hc4,
+        "HC4m" = model_hc4m,
+        "HC5" = model_hc5
     ),
     stars = c(
         "*" = 0.10,
@@ -213,10 +242,9 @@ plot(
     residuals(model_classical),
     xlab = "Fitted Wage",
     ylab = "Residual",
-    main = "Residuals vs. Fitted Values"
+    main = "Residuals vs. Fitted Values",
+    abline(h = 0, col = "red", lty = 2)
 )
-
-abline(h = 0, col = "red", lty = 2)
 
 # Breusch-Pagan test
 lmtest::bptest(model_classical)
@@ -233,8 +261,11 @@ lmtest::bptest(model_classical)
 # Wage is positive in the standard wage1 dataset.
 # A log specification is often useful for earnings.
 
+wages %<>% 
+    mutate(lwage = log(wage))
+
 model_log = econ_lm(
-    log(wage) ~ educ + exper + nonwhite + female + married,
+    lwage ~ educ + exper + nonwhite + female + married,
     data = wages,
     vcov = "HC1"
 )
@@ -257,14 +288,26 @@ summary(model_log)
 # Does the association between experience and wages
 # differ between women and men?
 
-model_interaction = econ_lm(
+wages %<>%
+    mutate(experXfemale = exper * female)
+
+model_interaction1 = econ_lm(
+    wage ~ educ + exper + female + experXfemale,
+    data = wages,
+    vcov = "HC1"
+)
+
+model_interaction2 = econ_lm(
     wage ~ educ + exper * female,
     data = wages,
     vcov = "HC1"
 )
 
-summary(model_interaction)
-tidy(model_interaction)
+summary(model_interaction1)
+summary(model_interaction2)
+
+tidy(model_interaction1)%>%
+    mutate(p.value = formatC(p.value, format = "f", digits = 8))
 
 # exper * female expands to:
 # exper + female + exper:female
@@ -275,10 +318,10 @@ tidy(model_interaction)
 # For female = 1:
 #   marginal effect of exper = beta_exper + beta_interaction
 
-coef(model_interaction)["exper"]
+coef(model_interaction2)["exper"]
 
-coef(model_interaction)["exper"] +
-    coef(model_interaction)["exper:female"]
+coef(model_interaction2)["exper"] +
+    coef(model_interaction2)["exper:female"]
 
 
 ###### 7. Linear Hypothesis Tests ####
@@ -287,9 +330,9 @@ coef(model_interaction)["exper"] +
 # The experience slope is equal across groups.
 
 car::linearHypothesis(
-    model_interaction,
+    model_interaction2,
     "exper:female = 0",
-    vcov. = vcov(model_interaction),
+    vcov. = vcov(model_interaction2),
     test = "F"
 )
 
@@ -297,12 +340,12 @@ car::linearHypothesis(
 # and the interaction coefficient are zero.
 
 car::linearHypothesis(
-    model_interaction,
+    model_interaction2,
     c(
         "female = 0",
         "exper:female = 0"
     ),
-    vcov. = vcov(model_interaction),
+    vcov. = vcov(model_interaction2),
     test = "F"
 )
 
@@ -310,7 +353,7 @@ car::linearHypothesis(
 # beta_exper + beta_interaction = 0
 
 car::linearHypothesis(
-    model_interaction,
+    model_interaction2,
     "exper + exper:female = 0",
     vcov. = vcov(model_interaction),
     test = "F"
@@ -359,7 +402,7 @@ new_workers = data.frame(
 )
 
 new_workers$predicted_wage = predict(
-    model_interaction,
+    model_interaction2,
     newdata = new_workers
 )
 
@@ -374,7 +417,7 @@ modelsummary(
     list(
         "Baseline OLS" = model_classical,
         "Robust OLS" = model_hc1,
-        "Interaction" = model_interaction
+        "Interaction" = model_interaction1
     ),
     stars = c(
         "*" = 0.10,
@@ -387,38 +430,6 @@ modelsummary(
 # Note:
 # R-squared is meaningful for OLS models.
 # Unlike ordered logit, there is a conventional OLS R-squared.
-
-
-###### 11. Comparison with Base R ####
-
-# Standard lm()
-base_model = lm(
-    wage ~ educ + exper + nonwhite + female + married,
-    data = wages
-)
-
-# EconR with classical covariance
-econ_model = econ_lm(
-    wage ~ educ + exper + nonwhite + female + married,
-    data = wages,
-    vcov = "classical"
-)
-
-# OLS coefficients should agree
-all.equal(
-    unname(coef(base_model)),
-    unname(coef(econ_model))
-)
-
-# Classical covariance matrices should agree
-all.equal(
-    unname(vcov(base_model)),
-    unname(vcov(econ_model))
-)
-
-# Compare reporting
-summary(base_model)
-summary(econ_model)
 
 
 
@@ -434,7 +445,6 @@ summary(MROZ)
 # Dependent variable:
 # inlf = 1 if the woman participates in the labor force
 # inlf = 0 otherwise
-
 table(MROZ$inlf)
 
 # Labor force participation rate
@@ -463,11 +473,12 @@ Logit = econ_binary(
 summary(Logit)
 
 # Tidy coefficient table
-tidy(Logit)
+tidy(Logit)%>%
+    mutate(p.value = formatC(p.value, format = "f", digits = 8))
 
 # Publication-style regression table
 modelsummary(
-    Logit,
+    list("First<br>Specification" = Logit),
     stars = c("*" = 0.10, "**" = 0.05, "***" = 0.01)
 )
 
@@ -583,7 +594,7 @@ modelsummary(
 
 ###### 7. Predicted Probabilities ######
 
-# Fitted probabilities for the first six observations
+# Fitted probabilities for the first six observations (same as fitted since data is the same!)
 head(predict(Logit, type = "response"))
 
 # These are probabilities, not predicted wages
@@ -597,8 +608,7 @@ head(predict(Logit, type = "response"))
 # Inspect actual outcomes and fitted probabilities
 data.frame(
     actual = MROZ$inlf,
-    predicted_probability = predict(Logit, type = "response")
-) %>%
+    predicted_probability = predict(Logit, type = "response")) %>%
     head()
 
 # Summary of predicted probabilities
@@ -893,9 +903,6 @@ modeltest = econ_ordered(
 
 # EconR summary
 summary(modeltest)
-
-# Tidy results
-broom::tidy(modeltest)
 
 # Confidence intervals
 generics::tidy(
@@ -1385,3 +1392,7 @@ modelsummary(
 #
 # It also produces valid category probabilities
 # between 0 and 1 that sum to 1.
+
+
+
+#### 5. Multinomial Logit ####
