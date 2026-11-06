@@ -528,6 +528,21 @@ exp(coef(Logit)["educ"])
 
 ###### 5. Modelsummary: Log-Odds vs. Odds Ratios ######
 
+# In a logit model, coefficients represent changes in the log-odds of an outcome,
+# holding other variables constant. Exponentiating a coefficient gives the odds
+# ratio (OR), which measures the multiplicative change in the odds for a one-unit
+# increase in the explanatory variable. For example, an OR of 1.20 indicates
+# 20% higher odds, NOT a 20% higher probability. Predicted probabilities instead
+# express the estimated likelihood of the outcome (between 0 and 1). Marginal
+# effects (ME) measure how these probabilities change with an explanatory variable,
+# expressed in percentage points when multiplied by 100. Since logit models are
+# nonlinear, marginal effects vary across individuals depending on their predicted
+# probabilities. The average marginal effect (AME) summarizes these individual
+# effects across the sample. For continuous variables, marginal effects are
+# derivatives; for binary variables, discrete probability changes are preferred.
+# Unlike odds ratios, marginal effects can also be compared more directly across
+# logit and probit models because they are expressed on the same probability scale.
+
 # Standard logit coefficients
 modelsummary(
     Logit,
