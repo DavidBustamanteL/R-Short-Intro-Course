@@ -462,8 +462,11 @@ MROZ %>%
 
 ###### 2. Estimate a Binary Logit Model ######
 
+MROZ %<>% 
+  mutate(sqr_age = age^2)
+
 Logit = econ_binary(
-    inlf ~ nwifeinc + educ + exper + age + kidslt6,
+    inlf ~ nwifeinc + educ + exper + age + sqr_age + kidslt6,
     link = "logit",
     vcov = "HC1",
     data = MROZ
@@ -496,13 +499,19 @@ coef(Logit)["educ"]
 
 # Interpretation:
 # One additional year of education changes the log-odds
-# of labor force participation by beta_educ,
+# of labor force participation by beta_educ units,
 # holding other variables constant.
-
-# Positive beta -> higher odds of participation.
-# Negative beta -> lower odds of participation.
 #
-# The probability change is not constant;
+# Positive beta -> higher log-odds, odds, and probability.
+# Negative beta -> lower log-odds, odds, and probability.
+#
+# Exponentiating beta gives the odds ratio (exp(beta)),
+# representing the multiplicative change in odds.
+#
+# Neither beta nor the odds ratio directly represents
+# a change in probability.
+#
+# The marginal effect on probability is not constant;
 # it depends on the individual's characteristics.
 
 
@@ -1425,6 +1434,11 @@ modelsummary(
 
 
 
+
+
+
+
+
 #### 6. Differences betw. logits and probits ####
 
 # Logit models assume a logistic error distribution, whereas probit models
@@ -1437,3 +1451,6 @@ modelsummary(
 # Alternatives (IIA) property, whereas probit assumes jointly normal errors,
 # allowing correlation across alternatives and more flexible substitution
 # patterns when the error covariance matrix is sufficiently unrestricted.
+
+
+
