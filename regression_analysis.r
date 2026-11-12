@@ -1419,7 +1419,1125 @@ modelsummary(
 
 
 
-#### 5. Multinomial Logit ####
+
+#### 6. Multinomial Logit ####
+
+# We simulate commuting choices for 1,500 individuals.
+#
+# Each individual chooses one of three transportation modes:
+#
+# 1. Bicycle
+# 2. Public Transport
+# 3. Car
+#
+# We assume that commuting decisions depend on:
+# - Distance to work (km)
+# - Monthly income (in thousands of euros)
+# - Daily parking costs (euros)
+# - Quality of public transport (scale from 1 to 5)
+# - Rainy weather (0 = no, 1 = yes)
+#
+# The dependent variable is nominal:
+# There is no natural ranking between the alternatives.
+#
+# Unlike ordered logit, multinomial logit does not assume
+# that the outcome categories have an ordering.
+
+
+###### 1. Simulate the Dataset ######
+
+set.seed(2026)
+
+n = 1500
+
+commuters = data.frame(
+    distance = round(runif(n, 1, 25), 1),
+    income = round(rlnorm(n, log(2.8), 0.35), 2),
+    parking = round(runif(n, 0, 12), 2),
+    transit_quality = sample(
+        1:5, n, replace = TRUE
+    ),
+    rain = rbinom(n, 1, 0.35)
+)
+
+# Define the systematic utilities.
+#
+# Bicycle is the reference alternative:
+# V_bicycle = 0
+#
+# Public Transport and Car utilities are specified
+# relative to Bicycle.
+#
+# These coefficients are chosen for simulation purposes.
+# They are not estimates from real commuting data.
+
+V_bicycle = rep(0, n)
+
+V_transit = -0.8 +
+    0.12 * commuters$distance +
+    0.10 * commuters$income +
+    0.45 * commuters$transit_quality +
+    0.80 * commuters$rain
+
+V_car = 0.2 +
+    0.18 * commuters$distance +
+    0.35 * commuters$income -
+    0.20 * commuters$parking +
+    0.40 * commuters$rain
+
+# Convert utilities into choice probabilities
+# using the multinomial logit formula.
+#
+# P(Y = j) = exp(V_j) / sum_k exp(V_k)
+#
+# For numerical stability, subtract the maximum
+# utility from each row before exponentiating.
+
+utilities = cbind(
+    Bicycle = V_bicycle,
+    Transit = V_transit,
+    Car = V_car
+)
+
+utilities = utilities -
+    apply(utilities, 1, max)
+
+exp_utilities = exp(utilities)
+
+choice_probs = exp_utilities /
+    rowSums(exp_utilities)
+
+# Verify that probabilities sum to one
+head(rowSums(choice_probs))
+
+# Simulate actual transportation choices
+# according to the individual probabilities.
+
+alternatives = c("Bicycle", "Transit", "Car")
+
+commuters$mode = factor(
+    vapply(
+        seq_len(n),
+        function(i) {
+            sample(
+                alternatives,
+                size = 1,
+                prob = choice_probs[i, ]
+            )
+        },
+        character(1)
+    ),
+    levels = alternatives
+)
+
+# Inspect the dataset
+head(commuters)
+str(commuters)
+summary(commuters)
+
+# Number of observations
+nrow(commuters)
+
+# Distribution of commuting choices
+table(commuters$mode)
+
+# Relative frequencies
+prop.table(table(commuters$mode))
+
+# IMPORTANT:
+# The first factor level, Bicycle, is the reference
+# category in the EconR multinomial logit model.
+
+
+###### 2. Exploratory Data Analysis ######
+
+# Distribution of commuting choices
+ggplot(commuters, aes(x = mode)) +
+    geom_bar() +
+    labs(
+        title = "Commuting Transportation Choices",
+        x = "Transportation Mode",
+        y = "Number of Commuters"
+    ) +
+    theme_minimal()
+
+# Descriptive statistics by transportation mode
+commuters %>%
+    group_by(mode) %>%
+    summarise(
+        observations = n(),
+        mean_distance = mean(distance),
+        mean_income = mean(income),
+        mean_parking = mean(parking),
+        mean_transit_quality = mean(transit_quality),
+        rain_share = mean(rain),
+        .groups = "drop"
+    )
+
+# Distance distribution by transportation mode
+ggplot(
+    commuters,
+    aes(x = mode, y = distance, fill = mode)
+) +
+    geom_boxplot(alpha = 0.6) +
+    labs(
+        title = "Commuting Distance by Transportation Mode",
+        x = "Transportation Mode",
+        y = "Distance to Work (km)"
+    ) +
+    theme_minimal() +
+    theme(legend.position = "none")
+
+# Discussion:
+# Are bicycle commuters traveling shorter distances?
+# Do car commuters have higher incomes?
+# Does better public transportation encourage transit use?
+# How might parking costs influence commuting choices?
+
+
+###### 3. Estimate a Multinomial Logit Model ######
+
+MNL = econ_multinomial(
+    mode ~ distance + income + parking +
+        transit_quality + rain,
+    data = commuters,
+    link = "logit",
+    vcov = "HC1"
+)
+
+# EconR regression summary
+summary(MNL)
+
+# Tidy coefficient table
+tidy(MNL) %>%
+    mutate(
+        p.value = formatC(
+            p.value,
+            format = "f",
+            digits = 8
+        )
+    )
+
+# Publication-style regression table
+modelsummary(
+    MNL,
+    shape = term + response ~ model,
+    stars = c(
+        "*" = 0.10,
+        "**" = 0.05,
+        "***" = 0.01
+    ),
+    title = "Multinomial Logit: Commuting Choices"
+)
+
+# The multinomial logit estimates separate coefficient
+# vectors for each non-reference outcome.
+#
+# With three alternatives and Bicycle as reference:
+#
+# log[P(Transit) / P(Bicycle)] = X'beta_Transit
+#
+# log[P(Car) / P(Bicycle)] = X'beta_Car
+#
+# We estimate two sets of coefficients.
+#
+# IMPORTANT:
+# Coefficients are expressed in log relative probabilities,
+# not direct changes in choice probabilities.
+
+
+###### 4. Understanding the Coefficients ######
+
+# Extract all coefficients
+coef(MNL)
+
+# Distance coefficients for Transit and Car
+coef(MNL)[
+    c("Transit", "Car"),
+    "distance"
+]
+
+# Individual coefficients
+coef(MNL)["Transit", "distance"]
+coef(MNL)["Car", "distance"]
+
+# Interpretation:
+#
+# A positive coefficient for Car:distance means
+# that an additional kilometer is associated with
+# a higher log probability ratio of choosing Car
+# rather than Bicycle, holding other variables constant.
+#
+# A negative coefficient means the corresponding
+# probability ratio decreases.
+#
+# Coefficients are alternative-specific.
+#
+# For instance:
+# distance can increase the relative probability
+# of both Car and Transit compared with Bicycle.
+#
+# However, the magnitude of the coefficients does
+# not directly tell us the change in probability.
+
+
+###### 5. Relative Risk Ratios ######
+
+# Exponentiate coefficients
+exp(coef(MNL))
+
+# These are Relative Risk Ratios (RRRs).
+# It tells us how a one-unit increase in an explanatory variable changes the relative probability
+# of choosing one outcome over a reference outcome in a multinomial logit model
+#
+# For alternative j relative to Bicycle:
+#
+# RRR = exp(beta_j)
+#
+# RRR > 1:
+# The probability ratio P(j) / P(Bicycle) increases.
+#
+# RRR < 1:
+# The probability ratio P(j) / P(Bicycle) decreases.
+#
+# RRR = 1:
+# No association with that relative probability ratio.
+
+# Example: distance and Car versus Bicycle
+exp(coef(MNL)["Car", "distance"])
+
+# Percentage change in the relative probability ratio
+100 * (exp(coef(MNL)["Car", "distance"]) - 1)
+
+# Interpretation:
+#
+# For each additional kilometer, the ratio of the
+# probability of choosing Car to the probability
+# of choosing Bicycle changes by this percentage,
+# holding all other regressors constant.
+#
+# IMPORTANT:
+# An RRR of 1.20 implies a 20% increase in
+# P(Car) / P(Bicycle).
+#
+# It does NOT imply a 20% increase in P(Car).
+#
+# Relative risk ratios are not probability ratios
+# across different individuals.
+
+
+###### 5.1. Log-Odds and Relative Risk Ratios ######
+
+# Multinomial logit coefficients represent log-odds
+# of choosing an alternative relative to the
+# reference category.
+#
+# Here, Bicycle is the reference category.
+#
+# log[P(Car) / P(Bicycle)] = X'beta_Car
+#
+# log[P(Transit) / P(Bicycle)] = X'beta_Transit
+#
+# A one-unit increase in x changes the respective
+# log-odds by beta_j, holding other variables constant.
+
+
+# Example: distance coefficient for Car
+beta_distance_car = coef(MNL)["Car", "distance"]
+beta_distance_car
+
+# Relative risk ratio
+rrr_distance_car = exp(beta_distance_car)
+rrr_distance_car
+
+# Percentage change in the relative probability ratio
+100 * (rrr_distance_car - 1)
+
+# Interpretation:
+#
+# An additional kilometer changes the log-odds
+# of choosing Car rather than Bicycle by beta.
+#
+# Exponentiating beta gives the multiplicative
+# change in P(Car) / P(Bicycle).
+#
+# For example:
+# beta = 0.20
+# RRR = exp(0.20) = 1.221
+#
+# This corresponds to approximately 22.1% higher
+# relative probability of Car versus Bicycle.
+
+
+###### 5.2. Log-Odds Between Two Non-Reference Categories ######
+
+# We can also calculate the relative probability
+# of choosing Car rather than Transit.
+#
+# log[P(Car) / P(Transit)]
+# = X'(beta_Car - beta_Transit)
+
+# Distance coefficients
+beta_car = coef(MNL)["Car", "distance"]
+beta_transit = coef(MNL)["Transit", "distance"]
+
+# Difference in log-odds coefficients
+log_odds_difference = beta_car - beta_transit
+log_odds_difference
+
+# Corresponding relative risk ratio
+exp(log_odds_difference)
+
+# Interpretation:
+#
+# The effect of distance on the Car-versus-Transit
+# log-odds equals the difference between the
+# corresponding coefficients.
+#
+# We do not need to change the reference category
+# or re-estimate the model.
+
+
+###### 5.3. Predicted Log-Odds and Probabilities ######
+
+# Consider one hypothetical commuter
+new_person = data.frame(
+    distance = 10,
+    income = 3,
+    parking = 5,
+    transit_quality = 3,
+    rain = 0
+)
+
+# Predicted probabilities
+p = predict(
+    MNL,
+    newdata = new_person,
+    type = "probs"
+)
+
+p
+
+# Log-odds: Car versus Bicycle
+log(p[1, "Car"] / p[1, "Bicycle"])
+
+# Odds: Car versus Bicycle
+p[1, "Car"] / p[1, "Bicycle"]
+
+# Log-odds: Transit versus Bicycle
+log(p[1, "Transit"] / p[1, "Bicycle"])
+
+# Log-odds: Car versus Transit
+log(p[1, "Car"] / p[1, "Transit"])
+
+# IMPORTANT:
+#
+# Log-odds may take any real value.
+#
+# Odds and relative risk ratios are positive.
+#
+# Predicted probabilities lie between 0 and 1.
+#
+# These quantities describe different aspects
+# of the same multinomial logit model.
+
+
+###### 6. Comparing Two Non-Reference Alternatives ######
+
+# Although Bicycle is the reference category,
+# we can also compare Car directly with Transit.
+#
+# The log relative probability is:
+#
+# log[P(Car) / P(Transit)]
+# = X'(beta_Car - beta_Transit)
+#
+# Therefore, the effect of distance on the
+# Car-versus-Transit log probability ratio is
+# the difference between their coefficients.
+
+beta_car_distance = coef(MNL)["Car", "distance"]
+
+beta_transit_distance = coef(MNL)["Transit", "distance"]
+
+# Difference in coefficients
+beta_car_distance - beta_transit_distance
+
+# Relative risk ratio: Car versus Transit
+exp(beta_car_distance - beta_transit_distance)
+
+# Interpretation:
+# This RRR describes how an additional kilometer
+# changes the relative probability of choosing
+# Car rather than Transit.
+#
+# We do not need to re-estimate the model using
+# a different reference category.
+
+
+###### 7. Modelsummary: Relative Risk Ratios ######
+
+# Standard multinomial logit coefficients
+modelsummary(
+    MNL,
+    shape = response + term ~ model,
+    title = "Commuting Choices: Log Relative Probabilities",
+    stars = c("*" = 0.10, "**" = 0.05, "***" = 0.01),
+    gof_map = c("nobs", "aic", "bic")
+)
+
+# Exponentiated coefficients
+modelsummary(
+    MNL,
+    shape = response + term ~ model,
+    exponentiate = TRUE,
+    title = "Commuting Choices: Relative Risk Ratios",
+    stars = c("*" = 0.10, "**" = 0.05, "***" = 0.01),
+    gof_map = c("nobs", "aic", "bic")
+)
+
+# With exponentiate = TRUE:
+# - Coefficients become relative risk ratios.
+# - The null hypothesis is RRR = 1.
+# - Statistical inference is based on the
+#   corresponding original coefficient tests.
+#
+# As with binary logit, exponentiation does not
+# produce marginal probability effects.
+
+
+###### 8. Predicted Choice Probabilities ######
+
+# Predict probabilities for all alternatives
+predicted_probs = predict(
+    MNL,
+    type = "probs"
+)
+
+head(predicted_probs)
+
+# Every individual receives three probabilities:
+# P(Bicycle), P(Transit), P(Car).
+#
+# Example:
+#
+# Bicycle  Transit  Car
+# 0.20     0.50     0.30
+#
+# Interpretation:
+# 20% probability of Bicycle
+# 50% probability of Transit
+# 30% probability of Car
+
+# Verify that probabilities sum to one
+head(rowSums(predicted_probs))
+
+# Average predicted probabilities
+colMeans(predicted_probs)
+
+# Compare with actual sample shares
+prop.table(table(commuters$mode))
+
+# For an unpenalized multinomial logit with
+# alternative-specific intercepts, the sample
+# average fitted probabilities should match
+# observed shares up to numerical tolerance.
+
+
+###### 9. Predict the Most Likely Transportation Mode ######
+
+# Predict the category with the highest probability
+predicted_mode = predict(
+    MNL,
+    type = "class"
+)
+
+head(predicted_mode)
+
+# Confusion matrix
+table(
+    Actual = commuters$mode,
+    Predicted = predicted_mode
+)
+
+# In-sample classification accuracy
+mean(predicted_mode == commuters$mode)
+
+# Compare with a simple baseline that always
+# predicts the most common transportation mode
+max(prop.table(table(commuters$mode)))
+
+# Important:
+# Classification accuracy is not a complete measure
+# of model quality.
+#
+# The multinomial logit primarily models probabilities.
+#
+# The most likely category may still have a predicted
+# probability substantially below 50%.
+#
+# These are in-sample predictions and should not
+# be interpreted as out-of-sample performance.
+
+
+###### 10. Predictions for Hypothetical Individuals ######
+
+# Consider three commuters with different distances,
+# but otherwise identical characteristics.
+
+new_commuters = data.frame(
+    distance = c(2, 10, 22),
+    income = c(3, 3, 3),
+    parking = c(5, 5, 5),
+    transit_quality = c(3, 3, 3),
+    rain = c(0, 0, 0)
+)
+
+# Predicted choice probabilities
+new_probs = predict(
+    MNL,
+    newdata = new_commuters,
+    type = "probs"
+)
+
+cbind(new_commuters, new_probs)
+
+# Discussion:
+# How does the probability of cycling change
+# as commuting distance increases?
+#
+# Does the probability of taking a car increase?
+#
+# Which transportation mode is most likely
+# for a commuter traveling 22 km?
+#
+# These are model-implied conditional probabilities,
+# not necessarily causal predictions.
+
+
+###### 11. Marginal Effects ######
+
+# In multinomial logit, the marginal effect of
+# a continuous variable x on the probability
+# of alternative j is:
+#
+# dP_j/dx = P_j * (beta_j - sum_k P_k * beta_k)
+#
+# The reference category has beta = 0.
+#
+# IMPORTANT:
+# A regressor affects all choice probabilities,
+# even when its coefficient for some alternative is zero.
+
+# Example: marginal effect of distance
+# for every individual and every alternative
+
+beta_distance = c(
+    Bicycle = 0,
+    Transit = coef(MNL)["Transit", "distance"],
+    Car = coef(MNL)["Car", "distance"]
+)
+
+# Remove any inherited names from scalar extraction
+beta_distance = unname(beta_distance)
+names(beta_distance) = alternatives
+
+# Align coefficients with the probability columns
+beta_distance = beta_distance[colnames(predicted_probs)]
+
+# Probability-weighted coefficient for each individual
+weighted_beta = as.vector(
+    predicted_probs %*% beta_distance
+)
+
+# Individual marginal effects
+me_distance = sweep(
+    predicted_probs,
+    2,
+    beta_distance,
+    "*"
+) - predicted_probs * weighted_beta
+
+head(me_distance)
+
+# Average marginal effects (AMEs)
+ame_distance = colMeans(me_distance)
+
+ame_distance
+
+# Percentage-point interpretation
+100 * ame_distance
+
+# Verify that marginal effects sum to zero
+sum(ame_distance)
+
+# Interpretation:
+#
+# If AME for Bicycle = -0.025:
+# An additional kilometer is associated with an
+# approximate 2.5 percentage-point decrease in
+# the probability of cycling, on average.
+#
+# All marginal effects across the three categories
+# must sum to zero.
+#
+# These are point estimates of AMEs.
+# This calculation does not provide standard errors.
+#
+# For a discrete variable such as rain, compare
+# predicted probabilities at rain = 0 and rain = 1
+# instead of interpreting a derivative.
+
+
+###### 12. Counterfactual: Increasing Parking Costs ######
+
+# Policy question:
+# What happens to transportation choices if
+# daily parking costs increase by 5 euros?
+#
+# We hold other observed characteristics fixed
+# and use the estimated model to predict outcomes.
+
+# Baseline predictions
+baseline_probs = predict(
+    MNL,
+    newdata = commuters,
+    type = "probs"
+)
+
+# Counterfactual dataset
+commuters_policy = commuters
+
+commuters_policy$parking =
+    commuters_policy$parking + 5
+
+# Counterfactual probabilities
+policy_probs = predict(
+    MNL,
+    newdata = commuters_policy,
+    type = "probs"
+)
+
+# Average predicted probabilities before policy
+colMeans(baseline_probs)
+
+# Average predicted probabilities after policy
+colMeans(policy_probs)
+
+# Average probability changes
+policy_effect = colMeans(
+    policy_probs - baseline_probs
+)
+
+# Express in percentage points
+100 * policy_effect
+
+# Verify that changes sum to zero
+sum(policy_effect)
+
+# Interpretation:
+#
+# The model predicts how an increase in parking
+# costs changes the distribution of commuting choices.
+#
+# Increasing parking costs may:
+# - Reduce the probability of choosing Car
+# - Increase the probability of choosing Transit
+# - Increase the probability of choosing Bicycle
+#
+# The probability changes sum to zero.
+#
+# IMPORTANT:
+# This is a model-based counterfactual.
+# It does not establish a causal policy effect.
+#
+# A causal interpretation would require additional
+# identification assumptions.
+
+
+###### 13. Visualizing the Parking-Cost Scenario ######
+
+# Compare baseline and counterfactual choice shares
+
+policy_comparison = data.frame(
+    mode = rep(
+        colnames(baseline_probs),
+        times = 2
+    ),
+    scenario = rep(
+        c("Baseline", "Parking +5 EUR"),
+        each = ncol(baseline_probs)
+    ),
+    probability = c(
+        colMeans(baseline_probs),
+        colMeans(policy_probs)
+    )
+)
+
+ggplot(
+    policy_comparison,
+    aes(
+        x = mode,
+        y = probability,
+        fill = scenario
+    )
+) +
+    geom_col(
+        position = "dodge",
+        width = 0.7
+    ) +
+    scale_y_continuous(
+        labels = scales::percent
+    ) +
+    labs(
+        title = "Predicted Commuting Choices",
+        subtitle = "Baseline vs. Higher Parking Costs",
+        x = "Transportation Mode",
+        y = "Average Predicted Probability",
+        fill = "Scenario"
+    ) +
+    theme_minimal()
+
+
+###### 14. Visualize Probabilities Across Distance ######
+
+# Construct hypothetical commuting profiles
+distance_profiles = data.frame(
+    distance = seq(1, 25, by = 1),
+    income = median(commuters$income),
+    parking = median(commuters$parking),
+    transit_quality = 3,
+    rain = 0
+)
+
+# Predict choice probabilities
+distance_probs = as.data.frame(
+    predict(
+        MNL,
+        newdata = distance_profiles,
+        type = "probs"
+    )
+)
+
+distance_probs$distance = distance_profiles$distance
+
+# Convert from wide to long format
+distance_probs_long = tidyr::pivot_longer(
+    distance_probs,
+    cols = -distance,
+    names_to = "mode",
+    values_to = "probability"
+)
+
+# Plot predicted probabilities
+ggplot(
+    distance_probs_long,
+    aes(
+        x = distance,
+        y = probability,
+        color = mode
+    )
+) +
+    geom_line(linewidth = 1) +
+    scale_y_continuous(
+        labels = scales::percent
+    ) +
+    labs(
+        title = "Transportation Choice by Commuting Distance",
+        x = "Distance to Work (km)",
+        y = "Predicted Probability",
+        color = "Transportation Mode"
+    ) +
+    theme_minimal()
+
+# Discussion:
+#
+# At which distance does cycling become less likely?
+#
+# Which transportation mode dominates at long distances?
+#
+# Do predicted probabilities change linearly?
+#
+# Why must the three probabilities sum to one?
+
+
+
+###### 15. Hypothesis Testing ######
+
+# Multinomial logit coefficients are stored as a matrix.
+# car::linearHypothesis() expects a coefficient vector.
+#
+# We construct a named coefficient vector that matches
+# the ordering of EconR's variance-covariance matrix.
+
+# HC1 robust covariance matrix
+V = vcov(MNL)
+
+# Flatten the coefficient matrix row by row
+b = as.vector(t(coef(MNL)))
+
+# Assign the parameter names from the covariance matrix
+names(b) = colnames(V)
+
+# Verify coefficient and covariance alignment
+stopifnot(
+    identical(names(b), colnames(V)),
+    identical(rownames(V), colnames(V)),
+    length(b) == ncol(V)
+)
+
+# Inspect the coefficient vector
+b
+
+
+###### 15.1. Joint Significance of Distance ######
+
+# H0: Distance has no effect on the relative
+# probabilities of Transit or Car versus Bicycle.
+#
+# H0:
+# beta_Transit,distance = 0
+# beta_Car,distance = 0
+#
+# H1: At least one coefficient differs from zero.
+#
+# Two restrictions imply a chi-square test with 2 df.
+
+# Construct the restriction matrix
+R1 = matrix(
+    0,
+    nrow = 2,
+    ncol = length(b),
+    dimnames = list(
+        c("Transit distance", "Car distance"),
+        names(b)
+    )
+)
+
+R1[1, "Transit:distance"] = 1
+R1[2, "Car:distance"] = 1
+
+# Joint robust Wald test
+car::linearHypothesis(
+    MNL,
+    hypothesis.matrix = R1,
+    coef. = b,
+    vcov. = V,
+    test = "Chisq"
+)
+
+# Interpretation:
+#
+# If p < 0.05, reject H0.
+#
+# Distance contributes significantly to explaining
+# the relative probabilities of the transportation
+# alternatives.
+#
+# If p >= 0.05, we fail to reject H0.
+#
+# This does not prove that distance has no effect.
+
+
+###### 15.2. Equality of Distance Coefficients ######
+
+# H0: The distance coefficients for Car and
+# Transit are equal.
+#
+# beta_Car,distance - beta_Transit,distance = 0
+#
+# Equivalently:
+#
+# H0: An additional kilometer does not change
+# the Car-versus-Transit relative probability ratio.
+#
+# One restriction implies chi-square with 1 df.
+
+# Construct the restriction matrix
+R2 = matrix(
+    0,
+    nrow = 1,
+    ncol = length(b),
+    dimnames = list(
+        "Car minus Transit distance",
+        names(b)
+    )
+)
+
+R2[1, "Car:distance"] = 1
+R2[1, "Transit:distance"] = -1
+
+# Robust Wald test
+car::linearHypothesis(
+    MNL,
+    hypothesis.matrix = R2,
+    coef. = b,
+    vcov. = V,
+    test = "Chisq"
+)
+
+# Interpretation:
+#
+# If p < 0.05, reject H0.
+#
+# Distance has statistically different effects
+# on the relative probabilities of Car and Transit.
+#
+# If p >= 0.05, the estimated difference is
+# not statistically significant at the 5% level.
+#
+# IMPORTANT:
+# The second test is NOT equivalent to testing
+# both coefficients separately against zero.
+#
+# It tests their difference and accounts for
+# the covariance between the estimates.
+
+
+###### 16. Compare Model Specifications ######
+
+# Model 1: Commuting distance only
+mnl1 = econ_multinomial(
+    mode ~ distance,
+    data = commuters,
+    link = "logit",
+    vcov = "HC1"
+)
+
+# Model 2: Distance and income
+mnl2 = econ_multinomial(
+    mode ~ distance + income,
+    data = commuters,
+    link = "logit",
+    vcov = "HC1"
+)
+
+# Model 3: Full specification
+mnl3 = econ_multinomial(
+    mode ~ distance + income + parking +
+        transit_quality + rain,
+    data = commuters,
+    link = "logit",
+    vcov = "HC1"
+)
+
+# Compare regression models
+modelsummary(
+    list(
+        "(1) Distance" = mnl1,
+        "(2) Income" = mnl2,
+        "(3) Full Model" = mnl3
+    ),
+    shape = term + response ~ model,
+    stars = c(
+        "*" = 0.10,
+        "**" = 0.05,
+        "***" = 0.01
+    ),
+    gof_map = c(
+        "nobs", "logLik", "aic", "bic"
+    ),
+    title = "Multinomial Logit: Model Comparison"
+)
+
+# Compare information criteria
+AIC(mnl1, mnl2, mnl3)
+
+BIC(mnl1, mnl2, mnl3)
+
+# Compare:
+#
+# Does including income improve the model fit?
+#
+# How does adding parking and transit quality
+# affect the estimated coefficients?
+#
+# Which variables are statistically significant?
+#
+# Which specification has the lowest AIC or BIC?
+#
+# IMPORTANT:
+# Information criteria compare model fit while
+# penalizing model complexity.
+#
+# AIC and BIC should be compared for models
+# estimated on the same observations and outcome.
+
+
+###### 17. Independence of Irrelevant Alternatives ######
+
+# The multinomial logit relies on the
+# Independence of Irrelevant Alternatives (IIA)
+# property.
+#
+# This means that the relative probability of
+# choosing alternative A rather than B does not
+# depend on the systematic utility of alternative C.
+#
+# For example:
+#
+# P(Car) / P(Bicycle) = exp(V_Car - V_Bicycle)
+#
+# This ratio does not depend on V_Transit.
+#
+# Suppose a new bus service is introduced.
+#
+# If it is very similar to the existing public
+# transport option, the multinomial logit may
+# imply unrealistic substitution patterns.
+#
+# This is related to the famous red-bus/blue-bus
+# problem.
+#
+# IMPORTANT:
+# The IIA property is a restriction of the
+# multinomial logit model.
+#
+# It is not automatically satisfied by real data.
+#
+# The suitability of IIA depends on whether the
+# choice alternatives are sufficiently distinct.
+
+
+###### 18. Multinomial Logit vs. Binary and Ordered Logit ######
+
+# Binary Logit:
+# - Exactly two outcome categories
+# - Example: Employed vs. Unemployed
+#
+# Ordered Logit:
+# - Three or more naturally ordered categories
+# - Example: Fair, Good, Excellent health
+#
+# Multinomial Logit:
+# - Three or more unordered categories
+# - Example: Bicycle, Transit, Car
+#
+# In multinomial logit:
+#
+# 1. One category serves as the reference.
+#
+# 2. Each non-reference category receives its
+#    own coefficient vector.
+#
+# 3. Coefficients describe log relative
+#    probabilities.
+#
+# 4. Exponentiated coefficients produce
+#    relative risk ratios.
+#
+# 5. Marginal effects depend on individual
+#    characteristics and the entire set of
+#    predicted choice probabilities.
+#
+# 6. Predicted probabilities across all
+#    alternatives sum to one.
+#
+# 7. The model implies the IIA property.
+#
+# The model is appropriate when individuals
+# choose between mutually exclusive,
+# unordered alternatives.
 
 
 
@@ -1439,7 +2557,8 @@ modelsummary(
 
 
 
-#### 6. Differences betw. logits and probits ####
+
+#### 7. Differences betw. logits and probits ####
 
 # Logit models assume a logistic error distribution, whereas probit models
 # assume a normal error distribution. In binary regression, both estimate
@@ -1451,6 +2570,5 @@ modelsummary(
 # Alternatives (IIA) property, whereas probit assumes jointly normal errors,
 # allowing correlation across alternatives and more flexible substitution
 # patterns when the error covariance matrix is sufficiently unrestricted.
-
 
 
