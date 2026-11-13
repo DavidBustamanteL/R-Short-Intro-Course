@@ -1819,16 +1819,16 @@ p = predict(
 p
 
 # Log-odds: Car versus Bicycle
-log(p[1, "Car"] / p[1, "Bicycle"])
+log(p["Car"] / p["Bicycle"])
 
 # Odds: Car versus Bicycle
-p[1, "Car"] / p[1, "Bicycle"]
+p["Car"] / p["Bicycle"]
 
 # Log-odds: Transit versus Bicycle
-log(p[1, "Transit"] / p[1, "Bicycle"])
+log(p["Transit"] / p["Bicycle"])
 
 # Log-odds: Car versus Transit
-log(p[1, "Car"] / p[1, "Transit"])
+log(p["Car"] / p["Transit"])
 
 # IMPORTANT:
 #
@@ -2540,24 +2540,6 @@ BIC(mnl1, mnl2, mnl3)
 # unordered alternatives.
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 #### 7. Differences betw. logits and probits ####
 
 # Logit models assume a logistic error distribution, whereas probit models
@@ -2570,5 +2552,3 @@ BIC(mnl1, mnl2, mnl3)
 # Alternatives (IIA) property, whereas probit assumes jointly normal errors,
 # allowing correlation across alternatives and more flexible substitution
 # patterns when the error covariance matrix is sufficiently unrestricted.
-
-
