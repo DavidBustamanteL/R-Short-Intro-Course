@@ -27,7 +27,7 @@ library(tidyverse)              # collection of packages for data science (ggplo
 library(stargazer)              # create regression tables (LaTeX, HTML, text)
 library(rms)                    # regression modeling strategies (advanced modeling, validation)
 library(readxl)                 # read Excel files (.xls, .xlsx)
-library(magrittr)               # pipe operator %>% and functional helpers
+library(magrittr)               # pipe operator %<>% and functional helpers
 library(broom)                  # tidy model outputs into data frames (tidy, glance, augment)
 library(texreg)                 # format regression results for LaTeX/HTML
 library(lmtest)                 # statistical tests for models (e.g. coeftest, hypothesis tests)
